@@ -1,0 +1,34 @@
+{
+    "name": "@archway/clio",
+    "version": "0.9.0",
+    "type": "module",
+    "bin": {
+      "clio": "./bin/clio"
+    },
+    "files": [
+      "src",
+      "bin"
+    ],
+    "private": false,
+    "engines": {
+      "node": ">=18"
+    },
+    "keywords": [
+      "glossary",
+      "vitepress",
+      "docs",
+      "wiki",
+      "documentation"
+    ],
+    "author": "0xbenc",
+    "license": "MIT",
+    "description": "CLI helpers for rich glossary support in Markdown.",
+    "dependencies": {
+      "chalk": "^5.4.0",
+      "commander": "^12.1.0",
+      "fuse.js": "^7.1.0",
+      "inquirer": "^9.3.7",
+      "slugify": "^1.6.6"
+    }
+  }
+  

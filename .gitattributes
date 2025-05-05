@@ -1,0 +1,13 @@
+# Ensure consistent LF endings in source, allow Windows checkouts
+* text=auto eol=lf
+
+# Force CLI launchers to LF (no CRLF shebang issues)
+bin/* text eol=lf
+
+# Treat shell and Node launchers as text for diff/highlight
+*.sh text
+*.cmd text
+*.ps1 text
+
+# Mark generated dist files as binary so Git ignores whitespace
+dist/* binary

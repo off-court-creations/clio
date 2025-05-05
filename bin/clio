@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+//  ── bin/clio ────────────────────────────────────────────────────────────────
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Do a dynamic `import` so Node resolves the ESM module properly
+await import(pathToFileURL(resolve(__dirname, '../src/cli.js')).href);

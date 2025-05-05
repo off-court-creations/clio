@@ -1,0 +1,24 @@
+# Node
+node_modules/
+npm-debug.log*
+package-lock.json.*.bak
+
+# Output / coverage
+dist/
+coverage/
+.nyc_output/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+*.sw?
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Misc
+*.tgz
