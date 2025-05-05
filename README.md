@@ -6,11 +6,11 @@ CLI helpers for maintaining a **smart glossary** within a documentation project.
 
 | Command | Purpose | Example |
 |---------|---------|---------|
-| **`vpw add`** | Add a new entry  | `vpw add` |
-| **`vpw search`** | Fuzzy find a definition with a substring | `vpw search png.win` |
-| **`vpw gloss`** | Create and update glossary links | `vpw gloss` |
-| **`vpw rename`** | Create and update glossary links | `vpw rename` |
-| **`vpw stats`** | View at-a-glance stats about the project | `vpw stats` |
+| **`clio`** | Create and update glossary links | `clio gloss` |
+| **`clio add`** | Add a new entry  | `clio add` |
+| **`clio search`** | Fuzzy find a definition with a substring | `clio search png.win` |
+| **`clio rename`** | Create and update glossary links | `clio rename` |
+| **`clio stats`** | View at-a-glance stats about the project | `clio stats` |
 
 ## Install
 
