@@ -7,6 +7,7 @@ import { renameCommand } from './commands/rename.js';
 import { statsCommand }  from './commands/stats.js';
 import { tocCommand }  from './commands/toc.js';
 import { initCommand } from './commands/init.js';
+import { suggestCommand } from './commands/suggest.js';
 
 const program = new Command();
 
@@ -48,6 +49,10 @@ program
   .command('toc')
   .description('Rebuild the Glossary Table of Contents')
   .action(tocCommand);
+
+program.command('suggest')
+  .description('Analyse docs and suggest potential glossary terms')
+  .action(suggestCommand);
 
 program
   .command('help')
