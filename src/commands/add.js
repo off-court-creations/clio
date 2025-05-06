@@ -14,11 +14,11 @@ if (!process.env.VISUAL && !process.env.EDITOR) {
 /*───────────────────────────────────────────────────────────────────────────*/
 
 const GLOSSARY_DIR = 'glossary';
-const TOC_MD = '_gloss_TOC.md';
+const TOC_MD       = '_gloss_TOC.md';
 
-const TOC_HEADER = '# Glossary Table of Contents\n\n';
-const ENTRY_START = '<!-- glossary-entry:start -->';
-const ENTRY_END = '<!-- glossary-entry:end -->';
+const TOC_HEADER   = '# Glossary Table of Contents\n\n';
+const ENTRY_START  = '<!-- glossary-entry:start -->';
+const ENTRY_END    = '<!-- glossary-entry:end -->';
 
 /*───────────────────────────────────────────────────────────────────────────*/
 /* helpers */
@@ -37,7 +37,7 @@ export async function addCommand() {
 
     const data = await promptForTerm();
     await writeTermFile(glossaryDir, data);
-    await updateTOC(glossaryDir, data);
+    await rebuildTOC(glossaryDir);            // 🔄 regenerate the whole TOC
 
     console.log(chalk.green('✓  Term added & glossary/TOC updated.'));
   } catch (err) {
@@ -174,8 +174,8 @@ async function promptForTerm() {
     }
 
     alternates.push({
-      singular: alt,
-      caseSensitive: altCs,
+      singular:       alt,
+      caseSensitive:  altCs,
       ...(altSingPossessive ? { singularPossessive: altSingPossessive } : {}),
       ...(altPluralTrimmed ? { plural: altPluralTrimmed } : {}),
       ...(altPluralPossessive ? { pluralPossessive: altPluralPossessive } : {})
@@ -228,8 +228,8 @@ async function writeTermFile(glossaryDir, data) {
 
   const meta = {
     ...data,
-    mentionedOnPages:    [],
-    mentionedByEntries:  []
+    mentionedOnPages:   [],
+    mentionedByEntries: []
   };
 
   const mdContent =
@@ -251,26 +251,39 @@ ${ENTRY_END}
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
-/* 4. Update _gloss_TOC.md */
-async function updateTOC(glossaryDir, data) {
-  const slug = slugify(data.singular, { lower: true, strict: true });
+/* 4. Rebuild _gloss_TOC.md from scratch */
+async function rebuildTOC(glossaryDir) {
   const tocPath = path.join(glossaryDir, TOC_MD);
-  const tocText = await fs.readFile(tocPath, 'utf8');
 
-  const lines   = tocText.trimEnd().split('\n');
-  const header  = lines.filter(l => !l.startsWith('- ['));
-  let   entries = lines.filter(l =>  l.startsWith('- ['));
+  /* gather every *.md file except the TOC itself */
+  const files = (await fs.readdir(glossaryDir))
+    .filter(f => f !== TOC_MD && path.extname(f) === '.md');
 
-  const newEntry = `- [${data.singular}](./${slug}.md)`;
+  const entries = [];
 
-  entries = entries.filter(l => l.toLowerCase() !== newEntry.toLowerCase());
-  entries.push(newEntry);
+  for (const file of files) {
+    const full = path.join(glossaryDir, file);
+    const firstLine = (await fs.readFile(full, 'utf8'))
+      .split('\n')[0]
+      .trim();
 
-  entries.sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+    const title = firstLine.startsWith('#')
+      ? firstLine.replace(/^#+\s*/, '')
+      : path.basename(file, '.md');
 
-  const rebuilt =
-    header.join('\n').trimEnd() + '\n\n' +
-    entries.join('\n') + '\n';
+    entries.push({ title, file });
+  }
+
+  /* α‑sorted, case‑insensitive */
+  entries.sort((a, b) =>
+    a.title.localeCompare(b.title, 'en', { sensitivity: 'base' })
+  );
+
+  const tocBody = entries
+    .map(e => `- [${e.title}](./${e.file})`)
+    .join('\n');
+
+  const rebuilt = TOC_HEADER + tocBody + '\n';
 
   await fs.writeFile(tocPath, rebuilt, 'utf8');
 }

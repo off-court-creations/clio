@@ -24,6 +24,7 @@ CLI commands run for all relevant markdown files within the folder.
 | **`clio rename`** | Rename glossary entries, recursively updating all docs pages | `clio rename` |
 | **`clio search`** | Fuzzy find a definition with a substring | `clio search Variant` |
 | **`clio stats`** | View at-a-glance stats about the project | `clio stats` |
+| **`clio toc`** | Rebuilds the Glossary Table of Contents | `clio toc` |
 | **`clio help`** | View syntax and help | `clio help` |
 
 ## Stabilty and Roadmap

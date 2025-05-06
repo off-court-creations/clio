@@ -5,6 +5,7 @@ import { searchCommand } from './commands/search.js';
 import { glossCommand }  from './commands/gloss.js';
 import { renameCommand } from './commands/rename.js';
 import { statsCommand }  from './commands/stats.js';
+import { tocCommand }  from './commands/toc.js';
 
 const program = new Command();
 
@@ -38,6 +39,11 @@ program
   .command('stats')
   .description('Show glossary usage statistics')
   .action(statsCommand);
+
+program
+  .command('toc')
+  .description('Rebuild the Glossary Table of Contents')
+  .action(tocCommand);
 
 /* explicit help */
 program
