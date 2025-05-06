@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name('clio')
   .description('Markdown Glossary Helpers')
-  .version('0.3.4');
+  .version('0.9.3');
 
 /* default (runs when no sub‑command supplied) */
 program
