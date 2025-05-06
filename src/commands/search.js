@@ -1,21 +1,32 @@
 //  ── src/commands/search.js ────────────────────────────────────────────────
-import fs from 'node:fs/promises';
+import fs   from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import Fuse from 'fuse.js';
 
-const GLOSSARY_DIR = 'glossary';
-const TOC_MD       = '_gloss_TOC.md';
-const ENTRY_REGEX  = /```glossary-entry\s*([\s\S]*?)```/;
+import { loadClioConfig } from '../utils/clioConfig.js';
+
+const TOC_MD      = '_gloss_TOC.md';
+const ENTRY_REGEX = /```json\s*([\s\S]*?)```/;
 
 /*───────────────────────────────────────────────────────────────────────────*/
-
 export async function searchCommand (query) {
-  try {
-    const projectRoot = process.cwd();
-    const glossaryDir = path.join(projectRoot, GLOSSARY_DIR);
+  /* locate project + glossary dir */
+  let meta;
+  try { meta = await loadClioConfig(); }
+  catch (e) {
+    console.error(chalk.red(`✖  ${e.message}`));
+    process.exit(1);
+  }
+  if (!meta) {
+    console.error(chalk.red('✖  Not inside a Clio project. Run "clio init" first.'));
+    process.exit(1);
+  }
+  const { projectRoot, glossaryDir } = meta;
 
+  try {
+    /* prompt for query if missing */
     if (!query) {
       ({ query } = await inquirer.prompt([{
         name: 'query',
@@ -48,11 +59,10 @@ export async function searchCommand (query) {
     const hits = fuse.search(query, { limit: 20 });
     if (!hits.length) {
       console.log(chalk.yellow('No matches.'));
-      process.exit(1);
+      process.exit(0);
     }
 
-    printResults(hits);
-    process.exit(0);
+    printResults(hits, projectRoot);
   } catch (err) {
     console.error(chalk.red('✖  Search failed\n'), err);
     process.exit(1);
@@ -60,7 +70,7 @@ export async function searchCommand (query) {
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
-/* Helpers */
+/* helpers */
 
 async function loadGlossary (dir) {
   let files;
@@ -91,24 +101,23 @@ async function loadGlossary (dir) {
       alternates: altWords,
       definition: data.definition,
       mentioned:  data.mentionedOnPages || [],
-      file:       fullPath,
-      data
+      file:       fullPath
     });
   }
   return out;
 }
 
-function printResults (hits) {
-  console.log(
-    chalk.green(`Found ${hits.length} match${hits.length === 1 ? '' : 'es'}:\n`)
-  );
+function printResults (hits, projectRoot) {
+  console.log(chalk.green(
+    `Found ${hits.length} match${hits.length === 1 ? '' : 'es'}:\n`
+  ));
 
   const width = Math.max(...hits.map(h => h.item.primary.length));
 
   hits.forEach((h, i) => {
     const term = h.item.primary.padEnd(width);
     const def  = h.item.definition.split('\n')[0];
-    const rel  = path.relative(process.cwd(), h.item.file);
+    const rel  = path.relative(projectRoot, h.item.file);
 
     console.log(
       chalk.cyan(`${i + 1}) ${term}  `) +
@@ -118,9 +127,10 @@ function printResults (hits) {
     console.log(chalk.dim('   File: ' + rel));
 
     if (h.item.mentioned.length) {
-      const pages = h.item.mentioned.join(', ');
-      console.log(chalk.yellow('   Mentioned on: ') + pages);
+      console.log(
+        chalk.yellow('   Mentioned on: ') + h.item.mentioned.join(', ')
+      );
     }
-    console.log(); // blank line between entries
+    console.log();
   });
 }

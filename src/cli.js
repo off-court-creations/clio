@@ -6,6 +6,7 @@ import { glossCommand }  from './commands/gloss.js';
 import { renameCommand } from './commands/rename.js';
 import { statsCommand }  from './commands/stats.js';
 import { tocCommand }  from './commands/toc.js';
+import { initCommand } from './commands/init.js';
 
 const program = new Command();
 
@@ -14,7 +15,10 @@ program
   .description('Markdown Glossary Helpers')
   .version('0.9.3');
 
-/* default (runs when no sub‑command supplied) */
+program.command('init')
+  .description('Create .clio/ project marker in current directory')
+  .action(initCommand);
+
 program
   .command('gloss', { isDefault: true })
   .description('Relink glossary terms across the docs [default]')
@@ -45,7 +49,6 @@ program
   .description('Rebuild the Glossary Table of Contents')
   .action(tocCommand);
 
-/* explicit help */
 program
   .command('help')
   .description('Display detailed usage information')

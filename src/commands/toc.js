@@ -1,26 +1,33 @@
-//  ── src/commands/toc.js ────────────────────────────────────────────────────
+//  ── src/commands/toc.js ───────────────────────────────────────────────────
 import fs   from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
 
-/*───────────────────────────────────────────────────────────────────────────*/
-/* constants */
-const GLOSSARY_DIR = 'glossary';
-const TOC_MD       = '_gloss_TOC.md';
-
-const TOC_HEADER   = '# Glossary Table of Contents\n\n';
+import { loadClioConfig } from '../utils/clioConfig.js';
 
 /*───────────────────────────────────────────────────────────────────────────*/
-/* public CLI entry‐point */
-export async function tocCommand() {
+const TOC_MD     = '_gloss_TOC.md';
+const TOC_HEADER = '# Glossary Table of Contents\n\n';
+
+/*───────────────────────────────────────────────────────────────────────────*/
+export async function tocCommand () {
+  /* resolve project + glossary dir */
+  let meta;
+  try { meta = await loadClioConfig(); }
+  catch (e) {
+    console.error(chalk.red(`✖  ${e.message}`));
+    process.exit(1);
+  }
+  if (!meta) {
+    console.error(chalk.red('✖  Not inside a Clio project. Run "clio init" first.'));
+    process.exit(1);
+  }
+  const { glossaryDir } = meta;
+
   try {
-    const projectRoot = process.cwd();
-    const glossaryDir = path.join(projectRoot, GLOSSARY_DIR);
-
     await ensureStructure(glossaryDir);
     await rebuildTOC(glossaryDir);
-
-    console.log(chalk.green('✓  Glossary TOC rebuilt.'));
+    console.log(chalk.green('✓  Glossary TOC rebuilt.'));
   } catch (err) {
     console.error(chalk.red('✖  Failed to rebuild TOC\n'), err);
     process.exit(1);
@@ -28,8 +35,7 @@ export async function tocCommand() {
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
-/* make sure folder + empty TOC exist so the rebuild won’t crash            */
-async function ensureStructure(dir) {
+async function ensureStructure (dir) {
   try { await fs.access(dir); }
   catch { await fs.mkdir(dir, { recursive: true }); }
 
@@ -39,41 +45,29 @@ async function ensureStructure(dir) {
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
-/* rebuild _gloss_TOC.md from every *.md file in glossary/                  */
-async function rebuildTOC(glossaryDir) {
+async function rebuildTOC (glossaryDir) {
   const tocPath = path.join(glossaryDir, TOC_MD);
 
-  /* gather every *.md file except the TOC itself */
   const files = (await fs.readdir(glossaryDir))
     .filter(f => f !== TOC_MD && path.extname(f) === '.md');
 
   const entries = [];
-
   for (const file of files) {
-    const full = path.join(glossaryDir, file);
-    const firstLine = (await fs.readFile(full, 'utf8'))
+    const firstLine = (await fs.readFile(path.join(glossaryDir, file), 'utf8'))
       .split('\n')[0]
       .trim();
-
     const title = firstLine.startsWith('#')
       ? firstLine.replace(/^#+\s*/, '')
       : path.basename(file, '.md');
-
     entries.push({ title, file });
   }
 
-  /* α‑sort, case‑insensitive */
   entries.sort((a, b) =>
     a.title.localeCompare(b.title, 'en', { sensitivity: 'base' })
   );
 
-  const tocBody = entries
-    .map(e => `- [${e.title}](./${e.file})`)
-    .join('\n');
-
-  const rebuilt = TOC_HEADER + tocBody + '\n';
-
-  await fs.writeFile(tocPath, rebuilt, 'utf8');
+  const tocBody = entries.map(e => `- [${e.title}](./${e.file})`).join('\n');
+  await fs.writeFile(tocPath, TOC_HEADER + tocBody + '\n', 'utf8');
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/

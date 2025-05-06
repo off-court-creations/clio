@@ -5,39 +5,48 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import slugify from 'slugify';
 
+import { loadClioConfig } from '../utils/clioConfig.js';
+
 /*───────────────────────────────────────────────────────────────────────────*/
-/* 0. Guarantee an editor for inquirer's `type:"editor"` prompt              */
+/* guarantee an editor for `type:"editor"` prompts                           */
 if (!process.env.VISUAL && !process.env.EDITOR) {
   process.env.EDITOR = process.platform === 'win32' ? 'notepad' : 'nano';
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
 
-const GLOSSARY_DIR = 'glossary';
-const TOC_MD       = '_gloss_TOC.md';
+const TOC_MD      = '_gloss_TOC.md';
+const TOC_HEADER  = '# Glossary Table of Contents\n\n';
+const ENTRY_START = '<!-- glossary-entry:start -->';
+const ENTRY_END   = '<!-- glossary-entry:end -->';
 
-const TOC_HEADER   = '# Glossary Table of Contents\n\n';
-const ENTRY_START  = '<!-- glossary-entry:start -->';
-const ENTRY_END    = '<!-- glossary-entry:end -->';
-
-/*───────────────────────────────────────────────────────────────────────────*/
 /* helpers */
-const defaultPlural      = word => `${word}s`;                 // dog → dogs
-const defaultPossessive  = word => (/s$/i.test(word) ? `${word}'` : `${word}'s`);
-const isYes              = str  => ['y', 'yes', 't', 'true'].includes(str);
+const defaultPlural      = w => `${w}s`;
+const defaultPossessive  = w => (/s$/i.test(w) ? `${w}'` : `${w}'s`);
+const isYes              = s => ['y','yes','t','true'].includes(s);
 
 /*───────────────────────────────────────────────────────────────────────────*/
 
-export async function addCommand() {
-  try {
-    const projectRoot = process.cwd();
-    const glossaryDir = path.join(projectRoot, GLOSSARY_DIR);
+export async function addCommand () {
+  /* locate project + config */
+  let meta;
+  try { meta = await loadClioConfig(); }
+  catch (err) {
+    console.error(chalk.red(`✖  ${err.message}`));
+    process.exit(1);
+  }
+  if (!meta) {
+    console.error('✖  Not inside a Clio project. Run "clio init" first.');
+    process.exit(1);
+  }
+  const { glossaryDir } = meta;
 
+  try {
     await ensureStructure(glossaryDir);
 
     const data = await promptForTerm();
     await writeTermFile(glossaryDir, data);
-    await rebuildTOC(glossaryDir);            // 🔄 regenerate the whole TOC
+    await rebuildTOC(glossaryDir);
 
     console.log(chalk.green('✓  Term added & glossary/TOC updated.'));
   } catch (err) {
@@ -47,8 +56,8 @@ export async function addCommand() {
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
-/* 1. Ensure folder & _gloss_TOC.md exist */
-async function ensureStructure(dir) {
+/* 1. ensure glossary dir + TOC exists                                       */
+async function ensureStructure (dir) {
   try { await fs.access(dir); }
   catch { await fs.mkdir(dir, { recursive: true }); }
 
@@ -58,9 +67,8 @@ async function ensureStructure(dir) {
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
-/* 2. Interactive prompts */
-async function promptForTerm() {
-  /* — main case‑sensitivity — */
+/* 2. interactive prompts (unchanged logic)                                  */
+async function promptForTerm () {
   const { caseSensitive } = await inquirer.prompt([{
     name: 'caseSensitive',
     type: 'input',
@@ -69,7 +77,6 @@ async function promptForTerm() {
   }]);
   const cs = isYes(caseSensitive);
 
-  /* — singular + singular possessive — */
   const { singular } = await inquirer.prompt([{
     name: 'singular',
     type: 'input',
@@ -88,7 +95,6 @@ async function promptForTerm() {
   const singularPossessive =
     !spRaw ? singularPossDefault : (spRaw === '-' ? undefined : spRaw);
 
-  /* — plural (+possessive) — */
   const pluralDefault = defaultPlural(singularTrimmed);
   const { pluralRaw } = await inquirer.prompt([{
     name: 'pluralRaw',
@@ -98,7 +104,7 @@ async function promptForTerm() {
   let pluralTrimmed;
   const pr = pluralRaw.trim();
   if (!pr) pluralTrimmed = pluralDefault;
-  else if (pr !== '-') pluralTrimmed = pr; // '-' means no plural
+  else if (pr !== '-') pluralTrimmed = pr;
 
   let pluralPossessive;
   if (pluralTrimmed) {
@@ -113,7 +119,6 @@ async function promptForTerm() {
     else if (ppRaw !== '-') pluralPossessive = ppRaw;
   }
 
-  /* — alternates — */
   const { altSingularCsv } = await inquirer.prompt([{
     name: 'altSingularCsv',
     type: 'input',
@@ -121,13 +126,9 @@ async function promptForTerm() {
   }]);
 
   const alternates = [];
-  const altSingulars = altSingularCsv
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
+  const altSingulars = altSingularCsv.split(',').map(s=>s.trim()).filter(Boolean);
 
   for (const alt of altSingulars) {
-    /* alt case‑sensitivity (default = same as main) */
     const { altCaseRaw } = await inquirer.prompt([{
       name: 'altCaseRaw',
       type: 'input',
@@ -136,7 +137,6 @@ async function promptForTerm() {
     }]);
     const altCs = altCaseRaw ? isYes(altCaseRaw) : cs;
 
-    /* alt plural */
     const altPluralDefault = defaultPlural(alt);
     const { altPluralRaw } = await inquirer.prompt([{
       name: 'altPluralRaw',
@@ -148,7 +148,6 @@ async function promptForTerm() {
     if (!apr) altPluralTrimmed = altPluralDefault;
     else if (apr !== '-') altPluralTrimmed = apr;
 
-    /* alt singular possessive */
     const altSingPossDefault = defaultPossessive(alt);
     const { altSingPossRaw } = await inquirer.prompt([{
       name: 'altSingPossRaw',
@@ -159,7 +158,6 @@ async function promptForTerm() {
     const altSingPossessive =
       !aspRaw ? altSingPossDefault : (aspRaw === '-' ? undefined : aspRaw);
 
-    /* alt plural possessive */
     let altPluralPossessive;
     if (altPluralTrimmed) {
       const altPluralPossDefault = defaultPossessive(altPluralTrimmed);
@@ -174,15 +172,14 @@ async function promptForTerm() {
     }
 
     alternates.push({
-      singular:       alt,
-      caseSensitive:  altCs,
+      singular:      alt,
+      caseSensitive: altCs,
       ...(altSingPossessive ? { singularPossessive: altSingPossessive } : {}),
-      ...(altPluralTrimmed ? { plural: altPluralTrimmed } : {}),
-      ...(altPluralPossessive ? { pluralPossessive: altPluralPossessive } : {})
+      ...(altPluralTrimmed   ? { plural: altPluralTrimmed }             : {}),
+      ...(altPluralPossessive? { pluralPossessive: altPluralPossessive } : {})
     });
   }
 
-  /* — definition (with editor fallback) — */
   let definition = '';
   try {
     ({ definition } = await inquirer.prompt([{
@@ -200,20 +197,18 @@ async function promptForTerm() {
     }]));
   }
 
-  /* — usage — */
   const { usage } = await inquirer.prompt([{
     name: 'usage',
     type: 'input',
     message: 'Use it in a sentence:'
   }]);
 
-  /* — build result — */
   return {
     caseSensitive: cs,
     singular: singularTrimmed,
     ...(singularPossessive ? { singularPossessive } : {}),
-    ...(pluralTrimmed ? { plural: pluralTrimmed } : {}),
-    ...(pluralPossessive ? { pluralPossessive } : {}),
+    ...(pluralTrimmed      ? { plural: pluralTrimmed } : {}),
+    ...(pluralPossessive   ? { pluralPossessive } : {}),
     alternates,
     definition: definition.trim(),
     usage: usage.trim()
@@ -221,8 +216,8 @@ async function promptForTerm() {
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
-/* 3. Create / overwrite the single‑file glossary entry */
-async function writeTermFile(glossaryDir, data) {
+/* 3. create / overwrite term file                                           */
+async function writeTermFile (glossaryDir, data) {
   const slug = slugify(data.singular, { lower: true, strict: true });
   const mdPath = path.join(glossaryDir, `${slug}.md`);
 
@@ -251,39 +246,25 @@ ${ENTRY_END}
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
-/* 4. Rebuild _gloss_TOC.md from scratch */
-async function rebuildTOC(glossaryDir) {
+/* 4. rebuild TOC                                                           */
+async function rebuildTOC (glossaryDir) {
   const tocPath = path.join(glossaryDir, TOC_MD);
 
-  /* gather every *.md file except the TOC itself */
   const files = (await fs.readdir(glossaryDir))
     .filter(f => f !== TOC_MD && path.extname(f) === '.md');
 
   const entries = [];
-
   for (const file of files) {
-    const full = path.join(glossaryDir, file);
-    const firstLine = (await fs.readFile(full, 'utf8'))
-      .split('\n')[0]
-      .trim();
-
+    const firstLine = (await fs.readFile(path.join(glossaryDir, file), 'utf8'))
+      .split('\n')[0].trim();
     const title = firstLine.startsWith('#')
       ? firstLine.replace(/^#+\s*/, '')
       : path.basename(file, '.md');
-
     entries.push({ title, file });
   }
 
-  /* α‑sorted, case‑insensitive */
-  entries.sort((a, b) =>
-    a.title.localeCompare(b.title, 'en', { sensitivity: 'base' })
-  );
+  entries.sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }));
 
-  const tocBody = entries
-    .map(e => `- [${e.title}](./${e.file})`)
-    .join('\n');
-
-  const rebuilt = TOC_HEADER + tocBody + '\n';
-
-  await fs.writeFile(tocPath, rebuilt, 'utf8');
+  const tocBody = entries.map(e => `- [${e.title}](./${e.file})`).join('\n');
+  await fs.writeFile(tocPath, TOC_HEADER + tocBody + '\n', 'utf8');
 }
