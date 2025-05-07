@@ -81,4 +81,4 @@ Clio follows [Semantic Versioning](https://semver.org/) (semver).
 
 `Clio` is authored by [0xbenc](https://github.com/0xbenc).
 
-<div align="center"> <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Charles_Meynier_-_Clio%2C_Muse_of_History_-_2003.6.5_-_Cleveland_Museum_of_Art.tiff/lossy-page1-800px-Charles_Meynier_-_Clio%2C_Muse_of_History_-_2003.6.5_-_Cleveland_Museum_of_Art.tiff.jpg" alt="Clio, Muse of History by Charles Meynier" width="600"/> <br/> <sub><i>Charles Meynier – Clio, Muse of History (Cleveland Museum of Art)</i></sub> </div>`
+<div align="center"> <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Charles_Meynier_-_Clio%2C_Muse_of_History_-_2003.6.5_-_Cleveland_Museum_of_Art.tiff/lossy-page1-800px-Charles_Meynier_-_Clio%2C_Muse_of_History_-_2003.6.5_-_Cleveland_Museum_of_Art.tiff.jpg" alt="Clio, Muse of History by Charles Meynier" width="600"/> <br/> <sub><i>Charles Meynier – Clio, Muse of History (Cleveland Museum of Art)</i></sub> </div>
