@@ -2,7 +2,7 @@ import fs   from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-const  Separator = inquirer.Separator;          // <- correct way to pull Separator
+const Separator = inquirer.Separator;
 import Fuse from 'fuse.js';
 
 import { loadClioConfig } from '../utils/clioConfig.js';
@@ -23,7 +23,16 @@ export async function suggestCommand () {
     process.exit(1);
   }
   const { projectRoot, glossaryDir, config } = meta;
-  const ignoreSet = new Set(config.ignoreWords || []);
+
+  /* ── load ignore list from separate file ───────────────────────────── */
+  const ignorePath = path.join(projectRoot, '.clio', config.ignoreFile || 'ignore.txt');
+  let ignoreSet = new Set();
+  try {
+    const raw = await fs.readFile(ignorePath, 'utf8');
+    raw.split(/\s+/).forEach(w => w && ignoreSet.add(w.toLowerCase()));
+  } catch {
+    /* file may not exist yet */
+  }
 
   /* known glossary + scan */
   const known  = await loadGlossaryTerms(glossaryDir);
@@ -36,7 +45,7 @@ export async function suggestCommand () {
 
   const shown = stats.clusters.slice(0, 30);
 
-  /* first checkbox – ignore list */
+  /* checkbox for ignore list */
   const ignoreChoices = [
     new Separator('─── start ───'),
     ...shown.map(c => ({
@@ -47,28 +56,24 @@ export async function suggestCommand () {
   ];
 
   const { toIgnore } = await inquirer.prompt([{
-    name: 'toIgnore',
-    type: 'checkbox',
+    name   : 'toIgnore',
+    type   : 'checkbox',
     message: 'Select terms to add to ignore list:',
-    loop: true,
+    loop   : true,
     pageSize: 20,
     choices: ignoreChoices
   }]);
 
-  /* update ignoreSet immediately so queue list excludes them */
+  /* update ignore set immediately */
   toIgnore.forEach(w => ignoreSet.add(w));
 
-  /* persist ignore list if any picked */
+  /* persist ignore file if needed */
   if (toIgnore.length) {
-    config.ignoreWords = [...ignoreSet].sort();
-    await fs.writeFile(
-      path.join(projectRoot, '.clio', 'config.json'),
-      JSON.stringify(config, null, 2) + '\n', 'utf8'
-    );
+    await fs.writeFile(ignorePath, [...ignoreSet].sort().join('\n') + '\n', 'utf8');
     console.log(chalk.green(`✓  Added ${toIgnore.length} word(s) to ignore list.`));
   }
 
-  /* second checkbox – queue for add, FILTERING OUT newly‑ignored ones */
+  /* second checkbox – queue for add (excluding ignores) */
   const addableChoices = [
     new Separator('─── start ───'),
     ...shown
@@ -81,18 +86,18 @@ export async function suggestCommand () {
   ];
 
   let toAdd = [];
-  if (addableChoices.length > 2) {          // more than separators
+  if (addableChoices.length > 2) {
     ({ toAdd } = await inquirer.prompt([{
-      name: 'toAdd',
-      type: 'checkbox',
+      name   : 'toAdd',
+      type   : 'checkbox',
       message: 'Select terms to queue for glossary creation:',
-      loop: true,
+      loop   : true,
       pageSize: 20,
       choices: addableChoices
     }]));
   }
 
-  /* sequentially launch clio add for each queued term */
+  /* sequentially run add for each queued term */
   for (const term of toAdd) {
     console.log(chalk.blue(`\n— Adding “${term}” —`));
     await addCommand({ prefillSingular: term });
@@ -103,9 +108,9 @@ export async function suggestCommand () {
 async function loadGlossaryTerms (dir) {
   const set = new Set();
   for (const f of (await fs.readdir(dir)).filter(x => x.endsWith('.md'))) {
-    const match = (await fs.readFile(path.join(dir, f), 'utf8')).match(ENTRY_REGEX);
-    if (!match) continue;
-    const d = JSON.parse(match[1]);
+    const m = (await fs.readFile(path.join(dir, f), 'utf8')).match(ENTRY_REGEX);
+    if (!m) continue;
+    const d = JSON.parse(m[1]);
     [
       d.singular, d.plural,
       ...d.alternates.map(a => a.singular),
@@ -147,10 +152,10 @@ async function scanDocs (root, glossDir, known, ignore) {
 
   await walk(root);
 
-  /* candidate words */
+  /* candidates */
   const candidates = [...freq.entries()].filter(([,v]) => v.count >= 3 && v.files.size >= 2);
 
-  /* fuzzy clustering */
+  /* fuzzy cluster */
   const fuse = new Fuse(
     candidates.map(([w]) => ({ word: w })),
     { includeScore: true, threshold: 0.3, keys: ['word'] }
@@ -159,13 +164,13 @@ async function scanDocs (root, glossDir, known, ignore) {
   const clusters = [];
   const seen = new Set();
 
-  for (const [word] of candidates.sort((a,b)=>b[1].count-a[1].count)) {
+  for (const [word] of candidates.sort((a,b)=>b[1].count - a[1].count)) {
     if (seen.has(word)) continue;
     const group = fuse.search(word).map(r => r.item.word);
     group.forEach(g => seen.add(g));
 
-    const total = group.reduce((sum, w) => sum + freq.get(w).count, 0);
-    const files = new Set(group.flatMap(w => [...freq.get(w).files]));
+    const total = group.reduce((n,x) => n + freq.get(x).count, 0);
+    const files = new Set(group.flatMap(x => [...freq.get(x).files]));
     clusters.push({ members: group, total, files });
   }
 
