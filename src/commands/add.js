@@ -6,13 +6,13 @@ import slugify from 'slugify';
 
 import { loadClioConfig } from '../utils/clioConfig.js';
 
-/* ensure some editor is defined */
+/* guarantee an editor for editor‑type prompts */
 if (!process.env.VISUAL && !process.env.EDITOR) {
   process.env.EDITOR = process.platform === 'win32' ? 'notepad' : 'nano';
 }
 
-const TOC_MD     = '_gloss_TOC.md';
-const TOC_HEADER = '# Glossary Table of Contents\n\n';
+const TOC_MD      = '_gloss_TOC.md';
+const TOC_HEADER  = '# Glossary Table of Contents\n\n';
 const ENTRY_START = '<!-- glossary-entry:start -->';
 const ENTRY_END   = '<!-- glossary-entry:end -->';
 
@@ -22,11 +22,11 @@ const defaultPossessive = w => (/s$/i.test(w) ? `${w}'` : `${w}'s`);
 const isYes             = s => ['y','yes','t','true'].includes(s);
 
 /**
- * Main entry‑point.
- * @param {{ prefillSingular?: string }} [opts]
+ * Public entry‑point
+ * @param {{ prefillSingular?: string }} opts
  */
 export async function addCommand (opts = {}) {
-  /* locate project */
+  /* find project */
   const meta = await loadClioConfig().catch(e => {
     console.error(chalk.red(`✖  ${e.message}`)); process.exit(1);
   });
@@ -38,12 +38,10 @@ export async function addCommand (opts = {}) {
 
   try {
     await ensureStructure(glossaryDir);
-
-    const data = await promptForTerm(opts.prefillSingular);
-    await writeTermFile(glossaryDir, data);
+    const termData = await promptForTerm(opts.prefillSingular);
+    await writeTermFile(glossaryDir, termData);
     await rebuildTOC(glossaryDir);
-
-    console.log(chalk.green(`✓  Added “${data.singular}” and updated TOC.`));
+    console.log(chalk.green(`✓  Added “${termData.singular}” and updated TOC.`));
   } catch (err) {
     console.error(chalk.red('✖  Failed to add term\n'), err);
     process.exit(1);
@@ -61,7 +59,8 @@ async function ensureStructure (dir) {
 }
 
 /*───────────────────────────────────────────────────────────────────────────*/
-async function promptForTerm (prefillSingular) {
+async function promptForTerm (prefill) {
+  /* case‑sensitivity (always ask) */
   const { caseSensitive } = await inquirer.prompt([{
     name: 'caseSensitive',
     type: 'input',
@@ -70,8 +69,34 @@ async function promptForTerm (prefillSingular) {
   }]);
   const cs = isYes(caseSensitive);
 
-  /* singular (prefilled if provided) */
-  let singularTrimmed = prefillSingular;
+  /* ------------------------------------------------------------------ */
+  /* Determine which word is singular vs plural when a prefill exists  */
+  let singularTrimmed, pluralPrefill;
+  if (prefill) {
+    const { form } = await inquirer.prompt([{
+      name : 'form',
+      type : 'list',
+      message: `The provided word “${prefill}” – is it singular or plural?`,
+      choices: [
+        { name: 'Singular', value: 'singular' },
+        { name: 'Plural',   value: 'plural'   }
+      ]
+    }]);
+
+    if (form === 'singular') {
+      singularTrimmed = prefill;
+    } else {
+      pluralPrefill = prefill;
+      ({ singularTrimmed } = await inquirer.prompt([{
+        name: 'singularTrimmed',
+        type: 'input',
+        message: 'Enter the singular form:',
+        validate: i => i.trim().length ? true : 'Required'
+      }]));
+    }
+  }
+
+  /* singular if not set yet */
   if (!singularTrimmed) {
     ({ singularTrimmed } = await inquirer.prompt([{
       name: 'singularTrimmed',
@@ -81,48 +106,50 @@ async function promptForTerm (prefillSingular) {
     }]));
   }
 
+  /* singular possessive ----------------------------------------------- */
   const singularPossDefault = defaultPossessive(singularTrimmed);
   const { singularPossessiveRaw } = await inquirer.prompt([{
     name: 'singularPossessiveRaw',
     type: 'input',
-    message:
-      `Possessive of "${singularTrimmed}" (Enter → "${singularPossDefault}", "-" for none, or custom):`
+    message: `Possessive of “${singularTrimmed}” (Enter → “${singularPossDefault}”, “-” for none, or custom):`
   }]);
   const spRaw = singularPossessiveRaw.trim();
   const singularPossessive =
     !spRaw ? singularPossDefault : (spRaw === '-' ? undefined : spRaw);
 
-  const pluralDefault = defaultPlural(singularTrimmed);
-  const { pluralRaw } = await inquirer.prompt([{
-    name: 'pluralRaw',
-    type: 'input',
-    message:
-      `Plural of "${singularTrimmed}" (Enter → "${pluralDefault}", "-" for none, or custom):`
-  }]);
-  let pluralTrimmed;
-  const pr = pluralRaw.trim();
-  if (!pr) pluralTrimmed = pluralDefault;
-  else if (pr !== '-') pluralTrimmed = pr;
+  /* plural ------------------------------------------------------------- */
+  let pluralTrimmed = pluralPrefill;
+  if (!pluralTrimmed) {
+    const pluralDefault = defaultPlural(singularTrimmed);
+    const { pluralRaw } = await inquirer.prompt([{
+      name: 'pluralRaw',
+      type: 'input',
+      message: `Plural of “${singularTrimmed}” (Enter → “${pluralDefault}”, “-” for none, or custom):`
+    }]);
+    const pr = pluralRaw.trim();
+    if (!pr) pluralTrimmed = pluralDefault;
+    else if (pr !== '-') pluralTrimmed = pr;
+  }
 
+  /* plural possessive */
   let pluralPossessive;
   if (pluralTrimmed) {
     const pluralPossDefault = defaultPossessive(pluralTrimmed);
     const { pluralPossessiveRaw } = await inquirer.prompt([{
       name: 'pluralPossessiveRaw',
       type: 'input',
-      message:
-        `Possessive of "${pluralTrimmed}" (Enter → "${pluralPossDefault}", "-" for none, or custom):`
+      message: `Possessive of “${pluralTrimmed}” (Enter → “${pluralPossDefault}”, “-” for none, or custom):`
     }]);
     const ppRaw = pluralPossessiveRaw.trim();
     if (!ppRaw) pluralPossessive = pluralPossDefault;
     else if (ppRaw !== '-') pluralPossessive = ppRaw;
   }
 
+  /* alternates --------------------------------------------------------- */
   const { altCsv } = await inquirer.prompt([{
     name: 'altCsv',
     type: 'input',
-    message:
-      'Alternate singular words/phrases (comma separated, leave blank if none):'
+    message: 'Alternate singular words/phrases (comma separated, leave blank if none):'
   }]);
 
   const alternates = [];
@@ -132,8 +159,7 @@ async function promptForTerm (prefillSingular) {
     const { altCaseRaw } = await inquirer.prompt([{
       name: 'altCaseRaw',
       type: 'input',
-      message:
-        `Is "${alt}" case‑sensitive? (Y/n) [default: ${cs ? 'y' : 'n'}]`,
+      message: `Is “${alt}” case‑sensitive? (Y/n) [default: ${cs ? 'y' : 'n'}]`,
       filter: i => (i ?? '').trim().toLowerCase()
     }]);
     const altCs = altCaseRaw ? isYes(altCaseRaw) : cs;
@@ -142,8 +168,7 @@ async function promptForTerm (prefillSingular) {
     const { altPluralRaw } = await inquirer.prompt([{
       name: 'altPluralRaw',
       type: 'input',
-      message:
-        `Plural of "${alt}" (Enter → "${altPluralDefault}", "-" for none, or custom):`
+      message: `Plural of “${alt}” (Enter → “${altPluralDefault}”, “-” for none, or custom):`
     }]);
     let altPluralTrimmed;
     const apr = altPluralRaw.trim();
@@ -154,8 +179,7 @@ async function promptForTerm (prefillSingular) {
     const { altSingPossRaw } = await inquirer.prompt([{
       name: 'altSingPossRaw',
       type: 'input',
-      message:
-        `Possessive of "${alt}" (Enter → "${altSingPossDefault}", "-" for none, or custom):`
+      message: `Possessive of “${alt}” (Enter → “${altSingPossDefault}”, “-” for none, or custom):`
     }]);
     const aspRaw = altSingPossRaw.trim();
     const altSingPossessive =
@@ -167,8 +191,7 @@ async function promptForTerm (prefillSingular) {
       const { altPluralPossRaw } = await inquirer.prompt([{
         name: 'altPluralPossRaw',
         type: 'input',
-        message:
-          `Possessive of "${altPluralTrimmed}" (Enter → "${altPluralPossDefault}", "-" for none, or custom):`
+        message: `Possessive of “${altPluralTrimmed}” (Enter → “${altPluralPossDefault}”, “-” for none, or custom):`
       }]);
       const appRaw = altPluralPossRaw.trim();
       if (!appRaw) altPluralPossessive = altPluralPossDefault;
@@ -179,12 +202,12 @@ async function promptForTerm (prefillSingular) {
       singular:      alt,
       caseSensitive: altCs,
       ...(altSingPossessive ? { singularPossessive: altSingPossessive } : {}),
-      ...(altPluralTrimmed   ? { plural: altPluralTrimmed }             : {}),
-      ...(altPluralPossessive? { pluralPossessive: altPluralPossessive } : {})
+      ...(altPluralTrimmed  ? { plural: altPluralTrimmed }              : {}),
+      ...(altPluralPossessive ? { pluralPossessive: altPluralPossessive } : {})
     });
   }
 
-  /* definition + usage */
+  /* definition + usage -------------------------------------------------- */
   let definition = '';
   try {
     ({ definition } = await inquirer.prompt([{
