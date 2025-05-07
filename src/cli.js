@@ -8,6 +8,7 @@ import { statsCommand }  from './commands/stats.js';
 import { tocCommand }  from './commands/toc.js';
 import { initCommand } from './commands/init.js';
 import { suggestCommand } from './commands/suggest.js';
+import { delinkCommand } from './commands/delink.js';
 
 const program = new Command();
 
@@ -53,6 +54,10 @@ program
 program.command('suggest')
   .description('Analyse docs and suggest potential glossary terms')
   .action(suggestCommand);
+
+program.command('delink')
+  .description('Remove local markdown links to other markdown files')
+  .action(delinkCommand);
 
 program
   .command('help')
