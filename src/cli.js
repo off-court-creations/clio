@@ -1,53 +1,53 @@
-//  ── src/cli.js ─────────────────────────────────────────────────────────────
+// ── src/cli.js ─────────────────────────────────────────────────────────────
 import { Command }       from 'commander';
-import { addCommand }    from './commands/add.js';
-import { searchCommand } from './commands/search.js';
-import { glossCommand }  from './commands/gloss.js';
-import { renameCommand } from './commands/rename.js';
-import { statsCommand }  from './commands/stats.js';
-import { tocCommand }  from './commands/toc.js';
-import { initCommand } from './commands/init.js';
-import { suggestCommand } from './commands/suggest.js';
-import { delinkCommand } from './commands/delink.js';
+import chalk             from 'chalk';
 
+import { initCommand }    from './commands/init.js';
+import { glossCommand }   from './commands/gloss.js';
+import { addCommand }     from './commands/add.js';
+import { searchCommand }  from './commands/search.js';
+import { renameCommand }  from './commands/rename.js';
+import { statsCommand }   from './commands/stats.js';
+import { tocCommand }     from './commands/toc.js';
+import { suggestCommand } from './commands/suggest.js';
+import { delinkCommand }  from './commands/delink.js';
+
+/* ───────────────────────── Commander set‑up ────────────────────────── */
 const program = new Command();
 
 program
   .name('clio')
-  .description('Markdown Glossary Helpers')
-  .version('0.9.3');
+  .description('Markdown glossary helpers')
+  .version('0.9.4')
+  /* nicer UX on typos */
+  .showSuggestionAfterError();
 
+/* explicit sub‑commands */
 program.command('init')
-  .description('Create .clio/ project marker in current directory')
+  .description('Initialise a Clio project in the current directory')
   .action(initCommand);
 
-program
-  .command('gloss', { isDefault: true })
-  .description('Relink glossary terms across the docs [default]')
+program.command('gloss')
+  .description('Relink glossary terms across the docs')
   .action(glossCommand);
 
-program
-  .command('add')
+program.command('add')
   .description('Interactively add a glossary term')
   .action(addCommand);
 
-program
-  .command('search [query]')
+program.command('search [query]')
   .description('Fuzzy‑search glossary terms')
   .action(searchCommand);
 
-program
-  .command('rename')
+program.command('rename')
   .description('Interactively rename a glossary term everywhere')
   .action(renameCommand);
 
-program
-  .command('stats')
+program.command('stats')
   .description('Show glossary usage statistics')
   .action(statsCommand);
 
-program
-  .command('toc')
+program.command('toc')
   .description('Rebuild the Glossary Table of Contents')
   .action(tocCommand);
 
@@ -59,11 +59,23 @@ program.command('delink')
   .description('Remove local markdown links to other markdown files')
   .action(delinkCommand);
 
-program
-  .command('help')
-  .description('Display detailed usage information')
-  .action(() => {
-    program.outputHelp();
-  });
+/* “help” is already built‑in (`clio --help`), but keep an alias */
+program.command('help').action(() => program.outputHelp());
 
-program.parseAsync();
+/* ───── unknown command handler (must be before parse) ───── */
+program.on('command:*', (operands) => {
+  console.error(
+    chalk.red(`✖  Unknown command “${operands[0]}”. See “clio help”.`)
+  );
+  process.exitCode = 1;
+});
+
+/* ───── default behaviour: run `gloss` when no args ───── */
+const userArgs = process.argv.slice(2);
+if (userArgs.length === 0) {
+  /* no sub‑command given – call gloss directly */
+  glossCommand();
+} else {
+  /* parse normally */
+  program.parseAsync(process.argv);
+}
