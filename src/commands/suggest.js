@@ -2,15 +2,14 @@ import fs   from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-const Separator = inquirer.Separator;
 import Fuse from 'fuse.js';
 
 import { loadClioConfig } from '../utils/clioConfig.js';
 import { addCommand }     from './add.js';
 
+const Separator = inquirer.Separator;
 const ENTRY_REGEX = /```json\s*([\s\S]*?)```/;
 const CODE_FENCE  = /```[\s\S]*?```/g;
-const TOC_MD      = '_gloss_TOC.md';
 
 /*───────────────────────────────────────────────────────────────────────────*/
 export async function suggestCommand () {

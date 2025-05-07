@@ -6,7 +6,7 @@ import { loadClioConfig } from '../utils/clioConfig.js';
 import { DEFAULT_IGNORE } from '../utils/defaultIgnore.js';
 
 const DEFAULT_GLOSSARY_DIR = 'glossary';
-const IGNORE_FILE          = 'ignore.txt';          // <── new
+const IGNORE_FILE          = 'ignore.txt';
 const TOC_MD               = '_gloss_TOC.md';
 const TOC_CONTENT          = '# Glossary Table of Contents\n\n';
 
@@ -40,14 +40,14 @@ export async function initCommand () {
     const cfg = {
       schema     : 1,
       glossaryDir: DEFAULT_GLOSSARY_DIR,
-      ignoreFile : IGNORE_FILE           // <── pointer instead of large array
+      ignoreFile : IGNORE_FILE
     };
     await fs.writeFile(cfgPath, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
     console.log(chalk.green('✓  Created .clio/config.json'));
 
     /* 4. re‑load config to respect custom paths ------------------------- */
     const { glossaryDir: glossaryAbs } = await loadClioConfig(cwd);
-    const glossaryRel = path.relative(cwd, glossaryAbs) || '.';   // for logs
+    const glossaryRel = path.relative(cwd, glossaryAbs) || '.';
 
     /* 5. glossary folder & stub TOC ------------------------------------- */
     await fs.mkdir(glossaryAbs, { recursive: true });
