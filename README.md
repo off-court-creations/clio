@@ -72,7 +72,7 @@ Clio follows [Semantic Versioning](https://semver.org/) (semver).
 >The `config.json` created in the `.clio` folder when running
 >
 >```shell
->npm init
+>clio init
 >```
 >
 >also contains a schema version number for potential future breaking data migrations.
