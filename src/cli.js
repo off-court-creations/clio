@@ -18,7 +18,7 @@ const program = new Command();
 program
   .name('clio')
   .description('Markdown glossary helpers')
-  .version('0.9.4')
+  .version('0.9.3')
   /* nicer UX on typos */
   .showSuggestionAfterError();
 
